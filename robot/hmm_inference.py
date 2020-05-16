@@ -156,6 +156,7 @@ def viterbi1(prev_m, cur_e, hmm):
         ptm_max = 0
         for Xt0 in hmm.get_states():
             ptm = hmm.pt(Xt0, Xt1) * prev_m[Xt0]
+            predecessors[Xt1] = Xt0 #bug when underflow - select always something
             if ptm > ptm_max:
                 ptm_max = ptm
                 predecessors[Xt1] = Xt0
@@ -163,7 +164,32 @@ def viterbi1(prev_m, cur_e, hmm):
     return cur_m, predecessors
 
 
-def viterbi(prior, e_seq, hmm):
+def viterbi1_log(prev_m, cur_e, hmm):
+    """Perform a single update of the max message for Viterbi algorithm
+       using log probabilities
+ 
+    :param prev_m: Counter, max message from the previous time slice
+    :param cur_e: current observation used for update
+    :param hmm: HMM, contains transition and emission models
+    :return: (cur_m, predecessors), i.e.
+             Counter, an updated max message, and
+             dict with the best predecessor of each state
+    """
+    cur_m = Counter()  # Current (updated) max message
+    predecessors = {}  # The best of previous states for each current state
+    for Xt1 in hmm.get_states():
+        ptm_max = -np.inf
+        for Xt0 in hmm.get_states():
+            ptm = np.log(hmm.pt(Xt0, Xt1)) + prev_m[Xt0]
+            if ptm > ptm_max:
+                ptm_max = ptm
+                predecessors[Xt1] = Xt0
+        cur_m[Xt1] = np.log(hmm.pe(Xt1, cur_e)) + ptm_max # (105b) recursion step
+    return cur_m, predecessors
+
+
+#FIXME: better name for viterbi withou underflow prevention
+def viterbi_normal(prior, e_seq, hmm):
     """Find the most likely sequence of states using Viterbi algorithm
  
     :param prior: Counter, prior belief distribution
@@ -188,4 +214,50 @@ def viterbi(prior, e_seq, hmm):
         #TODO: possible performance issue for longer sequences??
         ml_seq.insert(0, cur_p)
     return ml_seq, ms
+
+
+def viterbi_log(prior, e_seq, hmm):
+    """Find the most likely sequence of states using Viterbi algorithm
+       using log probabilities
+ 
+       :param prior: Counter, prior belief distribution
+       :param e_seq: sequence of observations
+       :param hmm: HMM, contains the transition and emission models
+       :return: (sequence of states, sequence of max messages)
+       """
+    ml_seq = []  # Most likely sequence of states
+    log_ms = []  # Sequence of max messages
+    np.seterr(divide='ignore')
+    # forward1 begin
+    pi_log = Counter()
+    for Xt1 in hmm.get_states():
+        pi_log[Xt1] = 0
+        for Xt0 in hmm.get_states():
+            if hmm.pt(Xt0, Xt1) * prior[Xt0] > 0:
+                pi_log[Xt1] += np.log(hmm.pt(Xt0, Xt1) * prior[Xt0])
+    b_log = Counter()
+    for Xt in hmm.get_states():
+        if hmm.pe(Xt, e_seq[0]) > 0 or 1:
+            b_log[Xt] = np.log(hmm.pe(Xt, e_seq[0]))
+    prev_log_m = Counter()
+    for Xt in hmm.get_states():
+        prev_log_m[Xt] = pi_log[Xt] + b_log[Xt] # (105a) initial set
+    # forward1 end
+    log_ms.append(prev_log_m)
+    predecessors_seq = []
+    for e in e_seq[1:]:
+        cur_log_m, predecessors = viterbi1_log(prev_log_m, e, hmm)
+        log_ms.append(cur_log_m)
+        prev_log_m = cur_log_m
+        predecessors_seq.append(predecessors)
+    cur_p = log_ms[-1].most_common(1)[0][0] # (105c) termination step
+    ml_seq.append(cur_p)
+    for p in reversed(predecessors_seq):
+        cur_p = p[cur_p]
+        ml_seq.insert(0, cur_p)
+    return ml_seq, log_ms
+
+
+def viterbi(prior, e_seq, hmm, underflow_prevention=False):
+    return viterbi_log(prior, e_seq, hmm) if underflow_prevention else viterbi_normal(prior, e_seq, hmm)
 
