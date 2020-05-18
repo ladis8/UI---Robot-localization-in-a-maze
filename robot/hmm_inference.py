@@ -154,9 +154,9 @@ def viterbi1(prev_m, cur_e, hmm):
     predecessors = {}  # The best of previous states for each current state
     for Xt1 in hmm.get_states():
         ptm_max = 0
+        predecessors[Xt1] = hmm.get_states()[0]  # bug when underflow - select always something
         for Xt0 in hmm.get_states():
             ptm = hmm.pt(Xt0, Xt1) * prev_m[Xt0]
-            predecessors[Xt1] = Xt0 #bug when underflow - select always something
             if ptm > ptm_max:
                 ptm_max = ptm
                 predecessors[Xt1] = Xt0
