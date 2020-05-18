@@ -79,7 +79,7 @@ def test_filtering():
 def test_smoothing():
     """Try to run smoothing for robot domain"""
     robot = init_maze()
-    states, obs = robot.simulate(init_state=(1, 10), n_steps=3)
+    states, obs = robot.simulate(init_state=(1, 10), n_steps=10)
     print('Running smoothing...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
     beliefs = forwardbackward(initial_belief, obs, robot)
@@ -94,7 +94,7 @@ def test_smoothing():
 def test_viterbi():
     """Try to run Viterbi alg. for robot domain"""
     robot = init_maze()
-    states, obs = robot.simulate(init_state=(3, 3), n_steps=500)
+    states, obs = robot.simulate(init_state=(3, 3), n_steps=30)
 
     print('Running Viterbi...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
@@ -110,8 +110,10 @@ def test_viterbi_log():
     print('Running log-based Viterbi...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
     ml_states, max_msgs = viterbi(initial_belief, obs, robot, underflow_prevention=True)
+    iter = 0
     for real, est in zip(states, ml_states):
-        print('Real pos:', real, '| ML Estimate:', est)
+        iter += 1
+        print('Iter:', iter, '| Real pos:', real, '| ML Estimate:', est)
 
 
 def print_robot(robot):
@@ -128,10 +130,10 @@ def print_robot(robot):
 
 if __name__ == '__main__':
     print('Uncomment some of the tests in the main section')
-    test_pt()
-    test_pe()
-    test_simulate()
-    test_filtering()
-    test_smoothing()
+    # test_pt()
+    # test_pe()
+    # test_simulate()
+    # test_filtering()
+    # test_smoothing()
     test_viterbi()
-    test_viterbi_log()
+    # test_viterbi_log()
