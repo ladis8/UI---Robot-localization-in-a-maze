@@ -1,5 +1,10 @@
 # UI---Robot-localization-in-a-maze
 
 ## TODO
-- [] test1
-- [x] test2
+### Josef
+- [x] Merge branches
+- [ ] Create jcedvel
+- [ ] Evaluation, metrics (test_robot.py)
+- [ ] Reprot init
+### Ladislav
+- [ ] void
