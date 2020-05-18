@@ -134,11 +134,9 @@ def forwardbackward(priors, e_seq, hmm):
     b = Counter({Xt: 1.0 for Xt in hmm.get_states()})
     for e, f in zip(reversed(e_seq), reversed(fs)):
         s = normalized(Counter({Xt: f[Xt] * b[Xt] for Xt in hmm.get_states()}))
-        #TODO: possible performance issue for longer sequences??
-        se.insert(0, s)
+        se.append(s)
         b = backward1(b, e, hmm)
-    return se
-
+    return list(reversed(se))
 
 def viterbi1(prev_m, cur_e, hmm):
     """Perform a single update of the max message for Viterbi algorithm
@@ -188,7 +186,6 @@ def viterbi1_log(prev_m, cur_e, hmm):
     return cur_m, predecessors
 
 
-#FIXME: better name for viterbi withou underflow prevention
 def viterbi_normal(prior, e_seq, hmm):
     """Find the most likely sequence of states using Viterbi algorithm
  
@@ -211,9 +208,8 @@ def viterbi_normal(prior, e_seq, hmm):
     ml_seq.append(cur_p)
     for p in reversed(predecessors_seq):
         cur_p = p[cur_p]
-        #TODO: possible performance issue for longer sequences??
-        ml_seq.insert(0, cur_p)
-    return ml_seq, ms
+        ml_seq.append(cur_p )
+    return list(reversed(ml_seq)), ms
 
 
 def viterbi_log(prior, e_seq, hmm):
