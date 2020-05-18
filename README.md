@@ -3,8 +3,10 @@
 ## TODO
 ### Josef
 - [x] Merge branches
-- [ ] Create jcedvel
+- [x] Create jcdevel
+- [ ] Review Matrices and merge
 - [ ] Evaluation, metrics (test_robot.py)
-- [ ] Reprot init
+- [ ] Maze generator init 
+- [ ] Report init
 ### Ladislav
 - [ ] void
