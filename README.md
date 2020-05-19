@@ -4,7 +4,6 @@
 ### Josef
 - [x] Merge branches
 - [x] Create jcdevel
-- [ ] Review Matrices and merge
 - [ ] Evaluation, metrics (test_robot.py)
 ### Ladislav
 - [ ] Merging robot_1.py and robot.py
