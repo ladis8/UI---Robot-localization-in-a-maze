@@ -6,6 +6,8 @@ Part of semestral project 2: Robot localization using HMM
 """
 
 import random
+import pandas as pd
+import numpy as np
 from collections import Counter
 from itertools import product
 
@@ -170,7 +172,7 @@ class NearFarSensor:
 class Robot(HMM):
     """Robot in a maze as HMM"""
 
-    def __init__(self, sensor_directions=None, move_probs=None):
+    def __init__(self, sensor_directions=ALL_DIRS, move_probs=DEFAULT_MOVE_PROBS):
         """Initialize robot with sensors and transition model
         
         :param sensor_directions: list of directions of individual sensors
@@ -178,13 +180,39 @@ class Robot(HMM):
         """
         self.maze = None
         self.position = None
-        if not sensor_directions:
-            sensor_directions = ALL_DIRS
-        self.sensors = []
-        for dir in sensor_directions:
-            self.sensors.append(NearFarSensor(robot=self, direction=dir))
-        self.move_probs = move_probs if move_probs else DEFAULT_MOVE_PROBS
+        self.sensors = [NearFarSensor(robot=self, direction=dir) for dir in sensor_directions]
+        self.move_probs = move_probs
 
+    # @overrids
+    def get_states(self):
+        """Return the list of possible states"""
+        return self.maze.get_free_positions()
+
+    # @overrids
+    def get_targets(self, state):
+        """Return the list of all states reachable in one step from the given state"""
+        tgts = [state]
+        for dir in ALL_DIRS:
+            next_state = add(state, dir)
+            if not self.maze.is_free(next_state): continue
+            tgts.append(next_state)
+        return tgts
+
+    # @overrids
+    def get_observations(self):
+        """Return the list of all possible observations"""
+        sensor_domains = [s.VALUES for s in self.sensors]
+        return list(product(*sensor_domains))
+
+    # @overrids
+    def step(self, state):
+        """Generate a next state for the current state"""
+        next_pos = super().step(state)
+        # print(next_pos)
+        self.position = next_pos
+        return next_pos
+
+    # @overrids
     def observe(self, state=None):
         """Perform single observation of all sensors
         
@@ -201,53 +229,22 @@ class Robot(HMM):
         self.position = saved_pos
         return obs
 
-    def next_move_dir(self):
-        """Return the direction of next move"""
-        return weighted_random_choice(self.move_probs)
-
-    def get_dist_to_wall(self, dir, pos=None):
-        """Return the distance to wall"""
-        if not pos:
-            pos = self.position
-        return self.maze.get_dist_to_wall(pos, dir)
-
-    def get_states(self):
-        """Return the list of possible states"""
-        return self.maze.get_free_positions()
-
-    def get_targets(self, state):
-        """Return the list of all states reachable in one step from the given state"""
-        tgts = [state]
-        for dir in ALL_DIRS:
-            next_state = add(state, dir)
-            if not self.maze.is_free(next_state): continue
-            tgts.append(next_state)
-        return tgts
-
-    def get_observations(self):
-        """Return the list of all possible observations"""
-        sensor_domains = [s.VALUES for s in self.sensors] 
-        return list(product(*sensor_domains))
-
-    def get_next_state_distr(self, cur_state):
-        """Return the distribution over possible next states
-        
-        Takes the walls around current state into account.
+    # @overrids
+    def simulate(self, init_state=None, n_steps=5):
+        """Perform several simulation steps starting from the given initial state
+        :return: 2-tuple, sequence of states, and sequence of observations
         """
-        p = Counter()
-        for dir in ALL_DIRS:
-            next_state = add(cur_state, dir)
-            if not self.maze.is_free(next_state):
-                pass
-            else:
-                p[next_state] = self.move_probs[dir]
-        return normalized(p)
+        if not init_state:
+            init_state = self.position
+        return super().simulate(init_state, n_steps)
 
+    # @overrids
     def pt(self, cur_state, next_state):
         """Return a single transition probability"""
-        p = self.get_next_state_distr(cur_state)
+        p = self._get_next_state_distr(cur_state)
         return p[next_state]
 
+    # @overrids
     def pe(self, pos, obs):
         """Return the probability of observing obs in state pos"""
         # Store current robot position and set a new one
@@ -262,22 +259,71 @@ class Robot(HMM):
         self.position = stored_pos
         return p
 
+    def assign_maze(self, maze):
+        self.maze = maze
+
+    def init_models(self):
+        self.A = self._initialize_transition_model()
+        self.B = self._initialize_emmision_model()
+
     def set_random_position(self):
         """Set the robot to a random admissible state"""
         self.position = random.choice(self.maze.get_free_positions())
 
-    def step(self, state):
-        """Generate a next state for the current state"""
-        next_pos = super().step(state)
-        # print(next_pos)
-        self.position = next_pos
-        return next_pos
+    def next_move_dir(self):
+        """Return the direction of next move"""
+        return weighted_random_choice(self.move_probs)
 
-    def simulate(self, init_state=None, n_steps=5):
-        """Perform several simulation steps starting from the given initial state
+    def get_dist_to_wall(self, dir, pos=None):
+        """Return the distance to wall"""
+        if not pos:
+            pos = self.position
+        return self.maze.get_dist_to_wall(pos, dir)
 
-        :return: 2-tuple, sequence of states, and sequence of observations
+    def _get_next_state_distr(self, cur_state):
+        """Return the distribution over possible next states
+        
+        Takes the walls around current state into account.
         """
-        if not init_state:
-            init_state = self.position
-        return super().simulate(init_state, n_steps)
+        p = Counter()
+        for dir in ALL_DIRS:
+            next_state = add(cur_state, dir)
+            if not self.maze.is_free(next_state):
+                pass
+            else:
+                p[next_state] = self.move_probs[dir]
+        return normalized(p)
+
+    def _initialize_transition_model(self):
+        n = len(self.get_states())
+        df = pd.DataFrame(np.zeros(shape=(n, n)), index=self.get_states(), columns=self.get_states())
+        for state in self.get_states():
+            for successor, prob in self._get_next_state_distr(state).items():
+                df[state][successor] = prob
+        return df
+
+    def _initialize_emmision_model(self):
+        m = len(self.get_states())
+        n = len(self.get_observations())
+        df = pd.DataFrame(np.zeros(shape=(m, n)), index=self.get_states(), columns=self.get_observations())
+
+        stored_state = self.position
+        for state in self.get_states():
+            self.position = state
+            for obs in self.get_observations():
+                prob = 1
+                for sensor, value in zip(self.sensors, obs):
+                    p = sensor.get_value_probabilities()
+                    prob *= p[value]
+                df[obs][state] = prob
+        # Restore robot position
+        self.position = stored_state
+        return df
+
+
+
+
+
+
+
+
