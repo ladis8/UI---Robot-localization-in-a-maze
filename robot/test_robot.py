@@ -13,6 +13,8 @@ from utils import normalized
 import probability_vector as pv
 
 import numpy as np
+import os
+import random as rnd
 
 direction_probabilities = {
     NORTH: 0.25,
@@ -22,15 +24,15 @@ direction_probabilities = {
 }
 
 
-def init_maze():
+def init_maze(maze_name='mazes/rect_6x10_obstacles.map'):
     """Create and initialize robot instance for subsequent test"""
-    m = Maze('mazes/rect_6x10_obstacles.map')
+    m = Maze(maze_name)
     #    robot = Robot(ALL_DIRS, direction_probabilities)
     robot = Robot()
     robot.assign_maze(m)
     robot.position = (1, 1)
-    print_robot(robot)
-    print('Robot at ', robot.position)
+    # print_robot(robot)
+    # print('Robot at ', robot.position)
     return robot
 
 
@@ -100,7 +102,7 @@ def test_smoothing():
 def test_viterbi():
     """Try to run Viterbi alg. for robot domain"""
     robot = init_maze()
-    states, obs = robot.simulate(init_state=(3, 3), n_steps=30)
+    states, obs = robot.simulate(init_state=(1, 1), n_steps=20)
 
     print('Running Viterbi...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
@@ -124,7 +126,7 @@ def test_viterbi_matrix():
 def test_viterbi_log():
     """Try to run log-based Viterbi alg. for robot domain"""
     robot = init_maze()
-    states, obs = robot.simulate(init_state=(1, 1), n_steps=500)
+    states, obs = robot.simulate(init_state=(1, 1), n_steps=20)
     print('Running log-based Viterbi...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
     ml_states, max_msgs = viterbi(initial_belief, obs, robot, underflow_prevention=True)
@@ -193,9 +195,9 @@ def get_euclidean_dist(states, beliefs):
     return sum / len(states)
 
 
-def evaluate(steps=10):
+def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map'):
     # FILTERING
-    robot = init_maze()
+    robot = init_maze(maze_name)
     states, obs = robot.simulate(n_steps=steps)
     print('Running filtering...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
@@ -204,15 +206,16 @@ def evaluate(steps=10):
     for state, belief in zip(states, beliefs):
         most_belief_state = sorted(belief.items(), key=lambda x: x[1], reverse=True)[0][0]
         most_beliefs.append(most_belief_state)
-        print('Real state:', state, '| Best belief:', most_belief_state)
+        # print('Real state:', state, '| Best belief:', most_belief_state)
     hit_rate_filter = get_hit_rate(states, most_beliefs)
     manhattan_dist_filter = get_manhattan_dist(states, most_beliefs)
     euclidean_dist_filter = get_euclidean_dist(states, most_beliefs)
     print('hit rate =', hit_rate_filter)
     print('manhattan dist =', manhattan_dist_filter)
     print('euclidean dist =', euclidean_dist_filter)
+
     # SMOOTHING
-    robot = init_maze()
+    robot = init_maze(maze_name)
     states, obs = robot.simulate(n_steps=steps)
     print('Running smoothing...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
@@ -221,21 +224,22 @@ def evaluate(steps=10):
     for state, belief in zip(states, beliefs):
         most_belief_state = sorted(belief.items(), key=lambda x: x[1], reverse=True)[0][0]
         most_beliefs.append(most_belief_state)
-        print('Real state:', state, '| Best belief:', most_belief_state)
+        # print('Real state:', state, '| Best belief:', most_belief_state)
     hit_rate_smooth = get_hit_rate(states, most_beliefs)
     manhattan_dist_smooth = get_manhattan_dist(states, most_beliefs)
     euclidean_dist_smooth = get_euclidean_dist(states, most_beliefs)
     print('hit rate =', hit_rate_smooth)
     print('manhattan dist =', manhattan_dist_smooth)
     print('euclidean dist =', euclidean_dist_smooth)
+
     # VITERBI
-    robot = init_maze()
+    robot = init_maze(maze_name)
     states, obs = robot.simulate(n_steps=steps)
     print('Running Viterbi...')
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
     ml_states, max_msgs = viterbi(initial_belief, obs, robot)
-    for real, est in zip(states, ml_states):
-        print('Real pos:', real, '| ML Estimate:', est)
+    # for real, est in zip(states, ml_states):
+    #     print('Real pos:', real, '| ML Estimate:', est)
     hit_rate_viterbi = get_hit_rate(states, ml_states)
     manhattan_dist_viterbi = get_manhattan_dist(states, ml_states)
     euclidean_dist_viterbi = get_euclidean_dist(states, ml_states)
@@ -243,6 +247,28 @@ def evaluate(steps=10):
     print('manhattan dist =', manhattan_dist_viterbi)
     print('euclidean dist =', euclidean_dist_viterbi)
 
+    return [hit_rate_filter, manhattan_dist_filter, euclidean_dist_filter,
+            hit_rate_smooth, manhattan_dist_smooth, euclidean_dist_smooth,
+            hit_rate_viterbi, manhattan_dist_viterbi, euclidean_dist_viterbi]
+
+def evaluate(steps=10):
+    path = 'mazes/'
+    mazes = os.listdir(path)
+    file = open("outfile.txt", "a+")
+
+    file.write('\n\n------------------------' + str(steps) + '\n')
+
+    for maze in mazes:
+        file.write(maze + '\n')
+        (hit_rate_filter, manhattan_dist_filter, euclidean_dist_filter,
+         hit_rate_smooth, manhattan_dist_smooth, euclidean_dist_smooth,
+         hit_rate_viterbi, manhattan_dist_viterbi, euclidean_dist_viterbi) = evaluate1(steps=steps, maze_name=path+maze)
+
+        file.write(str(hit_rate_filter) + '\t' + str(manhattan_dist_filter) + '\t' + str(euclidean_dist_filter) + '\n')
+        file.write(str(hit_rate_smooth) + '\t' + str(manhattan_dist_smooth) + '\t' + str(euclidean_dist_smooth) + '\n')
+        file.write(str(hit_rate_viterbi) + '\t' + str(manhattan_dist_viterbi) + '\t' + str(euclidean_dist_viterbi) + '\n')
+
+    file.close()
 
 def print_robot(robot):
     pos = robot.position
@@ -257,9 +283,14 @@ def print_robot(robot):
 
 
 if __name__ == '__main__':
+    rnd.seed(314)
+
     print('Uncomment some of the tests in the main section')
     # test_alg_steps()
-    evaluate()
+
+    steps_list = [10, 20, 50, 100, 300]
+    for st in steps_list:
+        evaluate(steps=st)
 
     # test_pt()
     # test_pe()
