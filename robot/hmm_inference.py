@@ -208,7 +208,7 @@ def viterbi_normal(prior, e_seq, hmm):
     ml_seq.append(cur_p)
     for p in reversed(predecessors_seq):
         cur_p = p[cur_p]
-        ml_seq.append(cur_p )
+        ml_seq.append(cur_p)
     return list(reversed(ml_seq)), ms
 
 
@@ -221,37 +221,33 @@ def viterbi_log(prior, e_seq, hmm):
        :param hmm: HMM, contains the transition and emission models
        :return: (sequence of states, sequence of max messages)
        """
-    ml_seq = []  # Most likely sequence of states
-    log_ms = []  # Sequence of max messages
-    np.seterr(divide='ignore')
+    ml_seq, log_ms, predecessors_seq = [], [], []  # Sequence of max messages
     # forward1 begin
-    pi_log = Counter()
+    prev_log_m = Counter()
     for Xt1 in hmm.get_states():
-        pi_log[Xt1] = 0
+        # update by time
         for Xt0 in hmm.get_states():
             if hmm.pt(Xt0, Xt1) * prior[Xt0] > 0:
-                pi_log[Xt1] += np.log(hmm.pt(Xt0, Xt1) * prior[Xt0])
-    b_log = Counter()
-    for Xt in hmm.get_states():
-        if hmm.pe(Xt, e_seq[0]) > 0 or 1:
-            b_log[Xt] = np.log(hmm.pe(Xt, e_seq[0]))
-    prev_log_m = Counter()
-    for Xt in hmm.get_states():
-        prev_log_m[Xt] = pi_log[Xt] + b_log[Xt] # (105a) initial set
+                prev_log_m[Xt1] += np.log(hmm.pt(Xt0, Xt1) * prior[Xt0])
+        # update by evidence
+        if hmm.pe(Xt1, e_seq[0]) > 0:
+            prev_log_m[Xt1] += np.log(hmm.pe(Xt1, e_seq[0]))
     # forward1 end
+
     log_ms.append(prev_log_m)
-    predecessors_seq = []
+
     for e in e_seq[1:]:
         cur_log_m, predecessors = viterbi1_log(prev_log_m, e, hmm)
         log_ms.append(cur_log_m)
         prev_log_m = cur_log_m
         predecessors_seq.append(predecessors)
-    cur_p = log_ms[-1].most_common(1)[0][0] # (105c) termination step
+    # (105c) termination step
+    cur_p = max(log_ms[-1], key=log_ms[-1].get)
     ml_seq.append(cur_p)
     for p in reversed(predecessors_seq):
         cur_p = p[cur_p]
-        ml_seq.insert(0, cur_p)
-    return ml_seq, log_ms
+        ml_seq.append(cur_p)
+    return list(reversed(ml_seq)), log_ms
 
 
 def viterbi(prior, e_seq, hmm, underflow_prevention=False):
