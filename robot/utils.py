@@ -53,6 +53,14 @@ def init_belief(states, use_probability_vector=False):
     return initial_belief
 
 
+def get_key_value_tuples(data, use_probability_vector=False):
+    if use_probability_vector:
+        key_value_tuples = zip(data.states, data.values)
+    else:
+        key_value_tuples = data.items()
+    return key_value_tuples
+
+
 if __name__ == "__main__":
     test_weighted_random_choices()
 

@@ -16,7 +16,7 @@ else:
     from hmm_inference import *
 
 from robot import *
-from utils import normalized, init_belief
+from utils import normalized, init_belief, get_key_value_tuples
 import probability_vector as pv
 
 
@@ -97,8 +97,7 @@ def test_filtering():
     for state, belief in zip(states, beliefs):
         print('Real state:', state)
         print('Sorted beliefs:')
-
-        key_value_tuples = zip(belief.states, belief.values) if USE_MATRIX else belief.items()
+        key_value_tuples = get_key_value_tuples(belief, USE_MATRIX)
 
         for k, v in sorted(sorted(key_value_tuples), key=lambda x: x[1], reverse=True):
             if v > 0:
@@ -118,9 +117,7 @@ def test_smoothing():
     for state, belief in zip(states, beliefs):
         print('Real state:', state)
         print('Sorted beliefs:')
-
-        key_value_tuples = zip(belief.states, belief.values) if USE_MATRIX else belief.items()
-
+        key_value_tuples = get_key_value_tuples(belief, USE_MATRIX)
         for k, v in sorted(key_value_tuples, key=lambda x: x[1], reverse=True):
             if v > 0:
                 print(k, ':', v)
@@ -301,9 +298,9 @@ if __name__ == '__main__':
     rnd.seed(314)
     print('Uncomment some of the tests in the main section')
 
-    steps_list = [10, 20, 50, 100, 300]
-    for st in steps_list:
-        evaluate(steps=st)
+    # steps_list = [10, 20, 50, 100, 300]
+    # for st in steps_list:
+    #     evaluate(steps=st)
 
     #test_matrix_alg_steps()
     #test_pt()
