@@ -5,16 +5,20 @@ BE3M33UI - Artificial Intelligence course, FEE CTU in Prague
 """
 
 # from hmm_inference import *
-from hmm_inference import *
+import os
+import numpy as np
+import random as rnd
+
+USE_MATRIX = False
+if USE_MATRIX:
+    from hmm_inference_matrix import *
+else:
+    from hmm_inference import *
+
 from robot import *
-
-from utils import normalized
-
+from utils import normalized, init_belief
 import probability_vector as pv
 
-import numpy as np
-import os
-import random as rnd
 
 direction_probabilities = {
     NORTH: 0.25,
@@ -23,8 +27,9 @@ direction_probabilities = {
     WEST: 0.25
 }
 
+#TODO: move more functions to tools
 
-def init_maze(maze_name='mazes/rect_6x10_obstacles.map'):
+def init_maze(maze_name='mazes/rect_6x10_sparse.map'):
     """Create and initialize robot instance for subsequent test"""
     m = Maze(maze_name)
     #    robot = Robot(ALL_DIRS, direction_probabilities)
@@ -34,6 +39,17 @@ def init_maze(maze_name='mazes/rect_6x10_obstacles.map'):
     # print_robot(robot)
     # print('Robot at ', robot.position)
     return robot
+
+def print_robot(robot):
+    pos = robot.position
+    m = robot.maze.map
+    for i in range(len(m)):
+        for ii in range(len(m[0])):
+            if pos == (i, ii):
+                print('R', end='')
+                continue
+            print(m[i][ii], end='')
+            print('\n', end='')
 
 
 def test_pt():
@@ -69,17 +85,22 @@ def test_simulate():
 
 def test_filtering():
     """Try to run filtering for robot domain"""
+
     robot = init_maze()
-    #    states, obs = robot.simulate(init_state=(1,1), n_steps=3)
-    states, obs = robot.simulate(n_steps=3)
+    if USE_MATRIX: robot.init_models()
+    states, obs = robot.simulate(n_steps=10)
     print('Running filtering...')
-    initial_belief = normalized({pos: 1 for pos in robot.get_states()})
-    initial_belief = pv.ProbabilityVector(initial_belief)
+
+    initial_belief = init_belief(robot.get_states(), USE_MATRIX)
     beliefs = forward(initial_belief, obs, robot)
+
     for state, belief in zip(states, beliefs):
         print('Real state:', state)
         print('Sorted beliefs:')
-        for k, v in sorted(belief.items(), key=lambda x: x[1], reverse=True):
+
+        key_value_tuples = zip(belief.states, belief.values) if USE_MATRIX else belief.items()
+
+        for k, v in sorted(sorted(key_value_tuples), key=lambda x: x[1], reverse=True):
             if v > 0:
                 print(k, ':', v)
 
@@ -87,14 +108,20 @@ def test_filtering():
 def test_smoothing():
     """Try to run smoothing for robot domain"""
     robot = init_maze()
+    if USE_MATRIX: robot.init_models()
     states, obs = robot.simulate(init_state=(1, 10), n_steps=10)
     print('Running smoothing...')
-    initial_belief = normalized({pos: 1 for pos in robot.get_states()})
+
+    initial_belief = init_belief(robot.get_states(), USE_MATRIX)
     beliefs = forwardbackward(initial_belief, obs, robot)
+
     for state, belief in zip(states, beliefs):
         print('Real state:', state)
         print('Sorted beliefs:')
-        for k, v in sorted(belief.items(), key=lambda x: x[1], reverse=True):
+
+        key_value_tuples = zip(belief.states, belief.values) if USE_MATRIX else belief.items()
+
+        for k, v in sorted(key_value_tuples, key=lambda x: x[1], reverse=True):
             if v > 0:
                 print(k, ':', v)
 
@@ -102,22 +129,11 @@ def test_smoothing():
 def test_viterbi():
     """Try to run Viterbi alg. for robot domain"""
     robot = init_maze()
-    states, obs = robot.simulate(init_state=(1, 1), n_steps=20)
+    if USE_MATRIX: robot.init_models()
+    states, obs = robot.simulate(init_state=(3, 3), n_steps=10)
 
     print('Running Viterbi...')
-    initial_belief = normalized({pos: 1 for pos in robot.get_states()})
-    ml_states, max_msgs = viterbi(initial_belief, obs, robot)
-    for real, est in zip(states, ml_states):
-        print('Real pos:', real, '| ML Estimate:', est)
-
-
-def test_viterbi_matrix():
-    """Try to run Viterbi alg. for robot domain"""
-    robot = init_maze()
-    states, obs = robot.simulate(init_state=(3, 3), n_steps=500)
-
-    print('Running Viterbi...')
-    initial_belief = pv.ProbabilityVector.rand_initialize(robot.get_states())
+    initial_belief = init_belief(robot.get_states(), USE_MATRIX)
     ml_states, max_msgs = viterbi(initial_belief, obs, robot)
     for real, est in zip(states, ml_states):
         print('Real pos:', real, '| ML Estimate:', est)
@@ -126,9 +142,12 @@ def test_viterbi_matrix():
 def test_viterbi_log():
     """Try to run log-based Viterbi alg. for robot domain"""
     robot = init_maze()
-    states, obs = robot.simulate(init_state=(1, 1), n_steps=20)
+    if USE_MATRIX: robot.init_models()
+    states, obs = robot.simulate(init_state=(1, 1), n_steps=10)
+
     print('Running log-based Viterbi...')
-    initial_belief = normalized({pos: 1 for pos in robot.get_states()})
+    initial_belief = init_belief(robot.get_states(), USE_MATRIX)
+
     ml_states, max_msgs = viterbi(initial_belief, obs, robot, underflow_prevention=True)
     iter = 0
     for real, est in zip(states, ml_states):
@@ -137,29 +156,32 @@ def test_viterbi_log():
 
 
 # TODO: test matrixes by simulating
-def test_alg_steps():
+def test_matrix_alg_steps():
     def test_steps_normal(robot, obs, obs2, initial_belief):
-        from hmm_inference import forward1, backward1, viterbi1
+        from hmm_inference import forward1, backward1, viterbi1, viterbi1_log
 
         v1 = forward1(initial_belief, obs, robot)
         v2 = forward1(v1, obs2, robot)
         back_v = backward1(v2, obs2, robot)
-        viterbi_v = viterbi1(v1, obs, robot)[0]
-        return [v1, v2, back_v, viterbi_v]
+        viterbi_v_log = viterbi1_log(initial_belief, obs, robot)[0]
+        viterbi_v = viterbi1(initial_belief, obs, robot)[0]
+        return [v1, v2, back_v, viterbi_v, viterbi_v_log]
 
     def test_steps_matrix(robot, obs, obs2, initial_belief):
-        from hmm_inference_matrix import forward1, backward1, viterbi1
-        initial_belief = pv.ProbabilityVector(initial_belief)
+        from hmm_inference_matrix import forward1, backward1, viterbi1, viterbi1_log
+        initial_belief = pv.ProbabilityVector.initialize_from_dict(initial_belief)
 
         v1_m = forward1(initial_belief, obs, robot)
         v2_m = forward1(v1_m, obs2, robot)
         back_v_m = backward1(v2_m, obs2, robot)
-        viterbi_v_m = viterbi1(v1_m, obs, robot)[0]
-        return [v1_m, v2_m, back_v_m, viterbi_v_m]
+        viterbi_v_m_log = viterbi1_log(initial_belief, obs, robot)[0]
+        viterbi_v_m = viterbi1(initial_belief, obs, robot)[0]
+        return [v1_m, v2_m, back_v_m, viterbi_v_m, viterbi_v_m_log]
 
     robot = init_maze()
     robot.position = (1, 5)
     robot.init_models()
+    print(robot.A)
 
     states, obs = robot.simulate(init_state=(3, 3), n_steps=20)
 
@@ -168,9 +190,13 @@ def test_alg_steps():
     initial_belief = normalized({pos: 1 for pos in robot.get_states()})
 
     for v_normal, v_matrix in zip(
-            test_steps_matrix(robot, obs, obs2, initial_belief),
-            test_steps_normal(robot, obs, obs2, initial_belief)):
+            test_steps_normal(robot, obs, obs2, initial_belief),
+            test_steps_matrix(robot, obs, obs2, initial_belief)
+            ):
         print(v_normal == v_matrix)
+        # for state in v_matrix.states:
+        #     print(state, ": "," ", v_matrix[state], "/", v_normal[state])
+        print()
 
 
 def get_hit_rate(states, beliefs):
@@ -270,31 +296,19 @@ def evaluate(steps=10):
 
     file.close()
 
-def print_robot(robot):
-    pos = robot.position
-    m = robot.maze.map
-    for i in range(len(m)):
-        for ii in range(len(m[0])):
-            if pos == (i, ii):
-                print('R', end='')
-                continue
-            print(m[i][ii], end='')
-        print('\n', end='')
-
 
 if __name__ == '__main__':
     rnd.seed(314)
-
     print('Uncomment some of the tests in the main section')
-    # test_alg_steps()
 
     steps_list = [10, 20, 50, 100, 300]
     for st in steps_list:
         evaluate(steps=st)
 
-    # test_pt()
-    # test_pe()
-    # test_simulate()
+    #test_matrix_alg_steps()
+    #test_pt()
+    #test_pe()
+    #test_simulate()
     # test_filtering()
     # test_smoothing()
     # test_viterbi()

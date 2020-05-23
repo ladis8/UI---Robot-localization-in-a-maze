@@ -9,8 +9,6 @@ from collections import Counter
 import numpy as np
 from probability_vector import ProbabilityVector
 
-#TODO: design abstract class holding pandas dataframe
-#TODO: viterbi_log with m.
 
 def update_belief_by_time_step(prev_B, hmm):
     """Update the distribution over states by 1 time step.
@@ -49,7 +47,7 @@ def update_belief_by_evidence(prev_B, e, hmm):
     :param normalize: bool, whether the result shall be normalized
     :return: Counter, current (updated) belief distribution over states
     """
-    return prev_B * hmm.B[e]
+    return hmm.B[e] * prev_B
 
 
 def forward1(prev_f, cur_e, hmm, normalize=False):
@@ -108,7 +106,7 @@ def backward1(next_b, next_e, hmm):
     :param hmm: HMM, contains the transition and emission models
     :return: Counter, current backward message
     """
-    return hmm.A.T @ (next_b * hmm.B[next_e])
+    return hmm.A.T @ (hmm.B[next_e] * next_b)
 
 
 def forwardbackward(priors, e_seq, hmm):
@@ -121,7 +119,7 @@ def forwardbackward(priors, e_seq, hmm):
     """
     se = []  # Smoothed belief distributions
     fs = forward(priors, e_seq, hmm)
-    b = ProbabilityVector({Xt: 1.0 for Xt in hmm.get_states()})
+    b = ProbabilityVector.initialize_from_dict({Xt: 1.0 for Xt in hmm.get_states()})
     for e, f in zip(reversed(e_seq), reversed(fs)):
         s = (f * b).normalize()
         se.append(s)
@@ -129,7 +127,6 @@ def forwardbackward(priors, e_seq, hmm):
     return list(reversed(se))
 
 
-#TODO: ugliest method - avoid using pandas series
 def viterbi1(prev_m, cur_e, hmm):
     """Perform a single update of the max message for Viterbi algorithm
  
@@ -140,9 +137,10 @@ def viterbi1(prev_m, cur_e, hmm):
              Counter, an updated max message, and
              dict with the best predecessor of each state
     """
-    predecessors = (prev_m * hmm.A).idxmax(axis=1).to_dict() #argmax of rows
-    p_v = (prev_m * hmm.A).max(axis=1) * hmm.B[cur_e]        #max of rows
-    return ProbabilityVector(dict(zip(hmm.get_states(), p_v.values))), predecessors
+    predecessors = (hmm.A * prev_m).argmax_row.to_dict()        #argmax of rows a = (hmm.A * prev_m)
+    prob_vector = (hmm.A * prev_m).max_row * hmm.B[cur_e]       #max of rows
+    return prob_vector, predecessors
+
 
 
 
@@ -157,17 +155,9 @@ def viterbi1_log(prev_m, cur_e, hmm):
              Counter, an updated max message, and
              dict with the best predecessor of each state
     """
-    cur_m = Counter()  # Current (updated) max message
-    predecessors = {}  # The best of previous states for each current state
-    for Xt1 in hmm.get_states():
-        ptm_max = -np.inf
-        for Xt0 in hmm.get_states():
-            ptm = np.log(hmm.pt(Xt0, Xt1)) + prev_m[Xt0]
-            if ptm > ptm_max:
-                ptm_max = ptm
-                predecessors[Xt1] = Xt0
-        cur_m[Xt1] = np.log(hmm.pe(Xt1, cur_e)) + ptm_max # (105b) recursion step
-    return cur_m, predecessors
+    predecessors = (hmm.A.log + prev_m).argmax_row.to_dict()        #argmax of rows a = (hmm.A * prev_m)
+    prob_vector = (hmm.A.log + prev_m).max_row + hmm.B[cur_e].log   #max of rows
+    return prob_vector, predecessors
 
 
 def viterbi_normal(prior, e_seq, hmm):
@@ -205,37 +195,34 @@ def viterbi_log(prior, e_seq, hmm):
        :param hmm: HMM, contains the transition and emission models
        :return: (sequence of states, sequence of max messages)
        """
-    ml_seq = []  # Most likely sequence of states
-    log_ms = []  # Sequence of max messages
-    np.seterr(divide='ignore')
-    # forward1 begin
-    pi_log = Counter()
+    ml_seq, log_ms, predecessors_seq = [], [], []  # Sequence of max messages
+
+    prev_log_m = Counter()
     for Xt1 in hmm.get_states():
-        pi_log[Xt1] = 0
+        # update by time
         for Xt0 in hmm.get_states():
             if hmm.pt(Xt0, Xt1) * prior[Xt0] > 0:
-                pi_log[Xt1] += np.log(hmm.pt(Xt0, Xt1) * prior[Xt0])
-    b_log = Counter()
-    for Xt in hmm.get_states():
-        if hmm.pe(Xt, e_seq[0]) > 0 or 1:
-            b_log[Xt] = np.log(hmm.pe(Xt, e_seq[0]))
-    prev_log_m = Counter()
-    for Xt in hmm.get_states():
-        prev_log_m[Xt] = pi_log[Xt] + b_log[Xt] # (105a) initial set
-    # forward1 end
+                prev_log_m[Xt1] += np.log(hmm.pt(Xt0, Xt1) * prior[Xt0])
+        # update by evidence
+        if hmm.pe(Xt1, e_seq[0]) > 0:
+            prev_log_m[Xt1] += np.log(hmm.pe(Xt1, e_seq[0]))
+
+    prev_log_m = ProbabilityVector.initialize_from_dict(prev_log_m)
+
     log_ms.append(prev_log_m)
-    predecessors_seq = []
+
     for e in e_seq[1:]:
         cur_log_m, predecessors = viterbi1_log(prev_log_m, e, hmm)
         log_ms.append(cur_log_m)
         prev_log_m = cur_log_m
         predecessors_seq.append(predecessors)
-    cur_p = log_ms[-1].most_common(1)[0][0] # (105c) termination step
+    # (105c) termination step
+    cur_p = log_ms[-1].argmax()
     ml_seq.append(cur_p)
     for p in reversed(predecessors_seq):
         cur_p = p[cur_p]
-        ml_seq.insert(0, cur_p)
-    return ml_seq, log_ms
+        ml_seq.append(cur_p)
+    return list(reversed(ml_seq)), log_ms
 
 
 def viterbi(prior, e_seq, hmm, underflow_prevention=False):

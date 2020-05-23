@@ -10,6 +10,8 @@ import bisect
 import random
 from collections import Counter
 
+import probability_vector as pv
+
 
 def weighted_random_choice(pdist):
     """Choose an element from distribution given as dict of values and their probs."""
@@ -40,6 +42,15 @@ def normalized(P, factor=None, return_normalization_factor=False):
         return norm, factor
     else:
         return norm
+
+def init_belief(states, use_probability_vector=False):
+
+    if use_probability_vector:
+        initial_belief = pv.ProbabilityVector.uniform_initialize(states)
+    else:
+        initial_belief = normalized({pos: 1 for pos in states})
+
+    return initial_belief
 
 
 if __name__ == "__main__":

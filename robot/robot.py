@@ -13,6 +13,7 @@ from itertools import product
 
 from utils import weighted_random_choice, normalized
 from hmm import HMM
+from probability_vector import ProbabilityVector, ProbabilityMatrix
 
 
 NORTH = (-1, 0)
@@ -295,18 +296,14 @@ class Robot(HMM):
         return normalized(p)
 
     def _initialize_transition_model(self):
-        n = len(self.get_states())
-        df = pd.DataFrame(np.zeros(shape=(n, n)), index=self.get_states(), columns=self.get_states())
+        model = ProbabilityMatrix(states=sorted(self.get_states()), obs=sorted(self.get_states()))
         for state in self.get_states():
             for successor, prob in self._get_next_state_distr(state).items():
-                df[state][successor] = prob
-        return df
+                model[state, successor] = prob
+        return model
 
     def _initialize_emmision_model(self):
-        m = len(self.get_states())
-        n = len(self.get_observations())
-        df = pd.DataFrame(np.zeros(shape=(m, n)), index=self.get_states(), columns=self.get_observations())
-
+        model = ProbabilityMatrix(states=sorted(self.get_states()), obs=sorted(self.get_observations()))
         stored_state = self.position
         for state in self.get_states():
             self.position = state
@@ -315,15 +312,9 @@ class Robot(HMM):
                 for sensor, value in zip(self.sensors, obs):
                     p = sensor.get_value_probabilities()
                     prob *= p[value]
-                df[obs][state] = prob
+                model[obs, state] = prob
         # Restore robot position
         self.position = stored_state
-        return df
-
-
-
-
-
-
+        return model
 
 
