@@ -300,6 +300,9 @@ class Robot(HMM):
       self.set_active_sensors()
       return p
 
+   def assign_maze(self, maze):
+      self.maze = maze
+
    def set_active_sensors(self):
       """Set a list of active sensors according to the orientation"""
       self.active_sensors = SENSORS_SWITCH[self.position[2]]

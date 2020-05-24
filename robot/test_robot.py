@@ -10,18 +10,23 @@ import numpy as np
 import random as rnd
 
 USE_MATRIX = False
-# ROBOT_MODEL = 'NESW'
+ROBOT_MODEL = 'FWD-LR' # {'FWD-LR', 'NESW'}
 
 if USE_MATRIX:
     from hmm_inference_matrix import *
 else:
     from hmm_inference import *
 
-from robot import *
+if ROBOT_MODEL == 'NESW':
+    from robot import *
+else:
+    from robot_1_model import *
+
 from utils import normalized, init_belief, get_key_value_tuples
 import probability_vector as pv
 import copy
 import numpy as np
+import random as rnd
 
 
 direction_probabilities = {
@@ -39,7 +44,8 @@ def init_maze(maze_name='mazes/rect_6x10_sparse.map'):
     #    robot = Robot(ALL_DIRS, direction_probabilities)
     robot = Robot()
     robot.assign_maze(m)
-    robot.position = (1, 1)
+    robot.position = (1, 1) if ROBOT_MODEL == 'NESW' else (1, 1, 0)
+    if ROBOT_MODEL == 'FWD-LR': robot.set_active_sensors()
     # print_robot(robot)
     # print('Robot at ', robot.position)
     return robot
@@ -224,9 +230,9 @@ def get_euclidean_dist(states, beliefs):
 
 def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None, VERBOSE=2):
 
-    hit_rate_filter, manhattan_dist_filter, euclidean_dist_filter = 0,0,0
-    hit_rate_smooth, manhattan_dist_smooth, euclidean_dist_smooth = 0,0,0
-    hit_rate_viterbi, manhattan_dist_viterbi, euclidean_dist_viterbi = 0,0,0
+    hit_rate_filter, manhattan_dist_filter, euclidean_dist_filter = [], [], []
+    hit_rate_smooth, manhattan_dist_smooth, euclidean_dist_smooth = [], [], []
+    hit_rate_viterbi, manhattan_dist_viterbi, euclidean_dist_viterbi = [], [], []
 
     robot = init_maze(maze_name)
 
@@ -234,7 +240,7 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
     for ipos in fp:
         if VERBOSE >= 1: print('------------------------------------')
         if VERBOSE >= 1: print(np.round(100*(fp.index(ipos)+1)/len(fp), 0), '%\tof inital positions')
-        robot.position = ipos
+        robot.position = ipos if ROBOT_MODEL == 'NESW' else (ipos[0], ipos[1], rnd.randint(0,3))
 
         states, obs = robot.simulate(n_steps=steps)
         initial_belief = normalized({pos: 1 for pos in robot.get_states()})
@@ -247,9 +253,14 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
             most_belief_state = sorted(belief.items(), key=lambda x: x[1], reverse=True)[0][0]
             most_beliefs.append(most_belief_state)
             if VERBOSE >= 4: print('Real state:', state, '| Best belief:', most_belief_state)
-        hit_rate_filter += get_hit_rate(states, most_beliefs)
-        manhattan_dist_filter += get_manhattan_dist(states, most_beliefs)
-        euclidean_dist_filter += get_euclidean_dist(states, most_beliefs)
+        # cumsum
+        # hit_rate_filter += get_hit_rate(states, most_beliefs)
+        # manhattan_dist_filter += get_manhattan_dist(states, most_beliefs)
+        # euclidean_dist_filter += get_euclidean_dist(states, most_beliefs)
+        # append
+        hit_rate_filter.append(get_hit_rate(states, most_beliefs))
+        manhattan_dist_filter.append(get_manhattan_dist(states, most_beliefs))
+        euclidean_dist_filter.append(get_euclidean_dist(states, most_beliefs))
         if VERBOSE >= 3: print('hit rate =', hit_rate_filter, '\nmanhattan dist =', manhattan_dist_filter, '\neuclidean dist =', euclidean_dist_filter)
 
         # SMOOTHING
@@ -260,9 +271,14 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
             most_belief_state = sorted(belief.items(), key=lambda x: x[1], reverse=True)[0][0]
             most_beliefs.append(most_belief_state)
             if VERBOSE >= 4: print('Real state:', state, '| Best belief:', most_belief_state)
-        hit_rate_smooth += get_hit_rate(states, most_beliefs)
-        manhattan_dist_smooth += get_manhattan_dist(states, most_beliefs)
-        euclidean_dist_smooth += get_euclidean_dist(states, most_beliefs)
+        # cumsum
+        # hit_rate_smooth += get_hit_rate(states, most_beliefs)
+        # manhattan_dist_smooth += get_manhattan_dist(states, most_beliefs)
+        # euclidean_dist_smooth += get_euclidean_dist(states, most_beliefs)
+        # append
+        hit_rate_smooth.append(get_hit_rate(states, most_beliefs))
+        manhattan_dist_smooth.append(get_manhattan_dist(states, most_beliefs))
+        euclidean_dist_smooth.append(get_euclidean_dist(states, most_beliefs))
         if VERBOSE >= 3: print('hit rate =', hit_rate_smooth, '\nmanhattan dist =', manhattan_dist_smooth, '\neuclidean dist =', euclidean_dist_smooth)
 
         # VITERBI
@@ -271,25 +287,44 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
         if VERBOSE >= 4:
             for real, est in zip(states, ml_states):
                 print('Real pos:', real, '| ML Estimate:', est)
-        hit_rate_viterbi += get_hit_rate(states, ml_states)
-        manhattan_dist_viterbi += get_manhattan_dist(states, ml_states)
-        euclidean_dist_viterbi += get_euclidean_dist(states, ml_states)
+        # cumsum
+        # hit_rate_viterbi += get_hit_rate(states, ml_states)
+        # manhattan_dist_viterbi += get_manhattan_dist(states, ml_states)
+        # euclidean_dist_viterbi += get_euclidean_dist(states, ml_states)
+        # append
+        hit_rate_viterbi.append(get_hit_rate(states, ml_states))
+        manhattan_dist_viterbi.append(get_manhattan_dist(states, ml_states))
+        euclidean_dist_viterbi.append(get_euclidean_dist(states, ml_states))
         if VERBOSE >= 3: print('hit rate =', hit_rate_viterbi, '\nmanhattan dist =', manhattan_dist_viterbi, '\neuclidean dist =', euclidean_dist_viterbi)
 
     if VERBOSE >= 2: print('------------------------------------')
     if VERBOSE >= 2: print('------------------------------------')
 
-    hit_rate_filter /= len(fp)
-    manhattan_dist_filter /= len(fp)
-    euclidean_dist_filter /= len(fp)
+    # cumsum
+    # hit_rate_filter /= len(fp)
+    # manhattan_dist_filter /= len(fp)
+    # euclidean_dist_filter /= len(fp)
+    #
+    # hit_rate_smooth /= len(fp)
+    # manhattan_dist_smooth /= len(fp)
+    # euclidean_dist_smooth /= len(fp)
+    #
+    # hit_rate_viterbi /= len(fp)
+    # manhattan_dist_viterbi /= len(fp)
+    # euclidean_dist_viterbi /= len(fp)
 
-    hit_rate_smooth /= len(fp)
-    manhattan_dist_smooth /= len(fp)
-    euclidean_dist_smooth /= len(fp)
+    # append
+    hit_rate_filter = np.median(sorted(hit_rate_filter))
+    manhattan_dist_filter = np.median(sorted(manhattan_dist_filter))
+    euclidean_dist_filter = np.median(sorted(euclidean_dist_filter))
 
-    hit_rate_viterbi /= len(fp)
-    manhattan_dist_viterbi /= len(fp)
-    euclidean_dist_viterbi /= len(fp)
+    hit_rate_smooth = np.median(sorted(hit_rate_smooth))
+    manhattan_dist_smooth = np.median(sorted(manhattan_dist_smooth))
+    euclidean_dist_smooth = np.median(sorted(euclidean_dist_smooth))
+
+    hit_rate_viterbi = np.median(sorted(hit_rate_viterbi))
+    manhattan_dist_viterbi = np.median(sorted(manhattan_dist_viterbi))
+    euclidean_dist_viterbi = np.median(sorted(euclidean_dist_viterbi))
 
     if VERBOSE >= 2:
         print('hit rate =', hit_rate_filter, '\nmanhattan dist =', manhattan_dist_filter, '\neuclidean dist =', euclidean_dist_filter)
@@ -308,22 +343,13 @@ def evaluate(steps=10):
 
     # file.write('\n\n------------------------' + str(steps) + '\n')
 
-    for maze in mazes[4:]:
+    for maze in mazes:
         print('---', maze, '---')
         # file.write(maze + '\n')
 
-        # (hit_rate_filter, manhattan_dist_filter, euclidean_dist_filter,
-        #  hit_rate_smooth, manhattan_dist_smooth, euclidean_dist_smooth,
-        #  hit_rate_viterbi, manhattan_dist_viterbi, euclidean_dist_viterbi) = evaluate1(steps=steps, maze_name=path+maze, file_object=file)
-
         # evaluate1(steps=steps, maze_name=path+maze, file_obj=file, VERBOSE=2)
         evaluate1(steps=steps, maze_name=path+maze)
-
         break
-
-        # file.write(str(hit_rate_filter) + '\t' + str(manhattan_dist_filter) + '\t' + str(euclidean_dist_filter) + '\n')
-        # file.write(str(hit_rate_smooth) + '\t' + str(manhattan_dist_smooth) + '\t' + str(euclidean_dist_smooth) + '\n')
-        # file.write(str(hit_rate_viterbi) + '\t' + str(manhattan_dist_viterbi) + '\t' + str(euclidean_dist_viterbi) + '\n')
 
     # file.close()
 
@@ -338,7 +364,6 @@ if __name__ == '__main__':
         evaluate(steps=st)
         print('')
         break
-
 
     #test_matrix_alg_steps()
     #test_pt()
