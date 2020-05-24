@@ -236,7 +236,8 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
 
     robot = init_maze(maze_name)
 
-    fp = robot.maze.get_free_positions()
+    fp0 = robot.maze.get_free_positions()
+    fp = rnd.sample(fp0, 10) if len(fp0) > 10 else fp0
     for ipos in fp:
         if VERBOSE >= 1: print('------------------------------------')
         if VERBOSE >= 1: print(np.round(100*(fp.index(ipos)+1)/len(fp), 0), '%\tof inital positions')
@@ -339,19 +340,18 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
 def evaluate(steps=10):
     path = 'mazes/'
     mazes = os.listdir(path)
-    # file = open("outfile.txt", "a+")
+    file = open("outfile.txt", "a+")
 
-    # file.write('\n\n------------------------' + str(steps) + '\n')
+    file.write('\n\n------------------------' + str(steps) + '\n')
 
     for maze in mazes:
         print('---', maze, '---')
-        # file.write(maze + '\n')
+        file.write(maze + '\n')
 
-        # evaluate1(steps=steps, maze_name=path+maze, file_obj=file, VERBOSE=2)
-        evaluate1(steps=steps, maze_name=path+maze)
-        break
+        evaluate1(steps=steps, maze_name=path+maze, file_obj=file, VERBOSE=2)
+        # evaluate1(steps=steps, maze_name=path+maze)
 
-    # file.close()
+    file.close()
 
 
 if __name__ == '__main__':
@@ -363,7 +363,6 @@ if __name__ == '__main__':
         print('======', st, 'STEPS ======')
         evaluate(steps=st)
         print('')
-        break
 
     #test_matrix_alg_steps()
     #test_pt()
