@@ -8,15 +8,17 @@ BE3M33UI - Artificial Intelligence course, FEE CTU in Prague
 import os
 import numpy as np
 import random as rnd
+import time
+import importlib
+
 
 USE_MATRIX = False
-ROBOT_MODEL = 'FWD-LR' # {'FWD-LR', 'NESW'}
-
 if USE_MATRIX:
     from hmm_inference_matrix import *
 else:
     from hmm_inference import *
 
+ROBOT_MODEL = 'FWD-LR' # {'FWD-LR', 'NESW'}
 if ROBOT_MODEL == 'NESW':
     from robot import *
 else:
@@ -36,9 +38,21 @@ direction_probabilities = {
     WEST: 0.25
 }
 
+ALL_MAZES = [
+    'mazes/rect_3x2_empty.map',
+    'mazes/rect_5x4_empty.map',
+    'mazes/rect_6x10_empty.map',
+    'mazes/rect_6x10_sparse.map',
+    'mazes/rect_8x8_maze.map',
+    'mazes_custom/rect_8x9_symmetric.map',
+    'mazes_custom/rect_13x14_symmetric_sparse.map',
+    'mazes_custom/rect_19x19_maze_large.map'
+
+]
+
 #TODO: move more functions to tools
 
-def init_maze(maze_name='mazes/rect_6x10_sparse.map'):
+def init_maze(maze_name='mazes_custom/rect_13x14_symmetric_sparse.map'):
     """Create and initialize robot instance for subsequent test"""
     m = Maze(maze_name)
     #    robot = Robot(ALL_DIRS, direction_probabilities)
@@ -162,7 +176,6 @@ def test_viterbi_log():
         print('Iter:', iter, '| Real pos:', real, '| ML Estimate:', est)
 
 
-# TODO: test matrixes by simulating
 def test_matrix_alg_steps():
     def test_steps_normal(robot, obs, obs2, initial_belief):
         from hmm_inference import forward1, backward1, viterbi1, viterbi1_log
@@ -188,9 +201,6 @@ def test_matrix_alg_steps():
     robot = init_maze()
     robot.position = (1, 5)
     robot.init_models()
-    print(robot.A)
-
-    states, obs = robot.simulate(init_state=(3, 3), n_steps=20)
 
     obs = ('f', 'n', 'f', 'n')
     obs2 = ('n', 'n', 'f', 'f')
@@ -204,6 +214,90 @@ def test_matrix_alg_steps():
         # for state in v_matrix.states:
         #     print(state, ": "," ", v_matrix[state], "/", v_normal[state])
         print()
+
+
+def compare_hmm_inferences_performance():
+
+    def test_time_of_execution(robot, states, obs, n_states, use_matrix):
+        globals()["hmm_inference"] = importlib.import_module("hmm_inference_matrix" if use_matrix else "hmm_inference")
+
+        initial_belief = init_belief(robot.get_states(), use_matrix)
+
+        print ("Running forward for {} steps".format(n_states))
+        start = time.time()
+        f = initial_belief
+        for e in obs:
+            f = hmm_inference.forward1(f, e, robot, True)
+        forward_execution_time = time.time() - start
+        print ("Forward execution seconds {}".format(forward_execution_time))
+
+
+        print ("Running backward for {} steps".format(n_states))
+        prior = {Xt: 1.0 for Xt in robot.get_states()}
+        b = ProbabilityVector.initialize_from_dict(prior) if use_matrix else Counter(prior)
+
+        start = time.time()
+        for e in reversed(obs):
+            b = hmm_inference.backward1(b, e, robot)
+        backward_execution_time = time.time() - start
+        print ("Backward execution seconds {}".format(backward_execution_time))
+
+        print ("Running Viterbi for {} steps".format(n_states))
+        m = hmm_inference.forward1(initial_belief, obs[0], robot)
+
+        start = time.time()
+        for e in obs[1:]:
+            m, _ = hmm_inference.viterbi1(m, e, robot)
+        viterbi_execution_time = time.time() - start
+        print ("Viiterbi execution seconds {}".format(viterbi_execution_time))
+
+
+        print ("Running Viterbi Log for {} steps".format(n_states))
+        m = hmm_inference.forward1(initial_belief, obs[0], robot)
+
+        start = time.time()
+        for e in obs[1:]:
+            m, _ = hmm_inference.viterbi1_log(m, e, robot)
+        viterbi_log_execution_time = time.time() - start
+        print ("Viiterbi Log execution seconds {}".format(viterbi_log_execution_time))
+
+        return [forward_execution_time, backward_execution_time, viterbi_execution_time, viterbi_log_execution_time]
+
+    time_ratio_per_num_states = []
+
+    for maze in ALL_MAZES:
+
+        print("Maze {}".format(maze))
+        robot = init_maze(maze)
+        steps = 50
+
+        start = time.time()
+        robot.init_models()
+        model_generation_time = time.time() - start
+        print ("Model matrices generation time: {}".format(model_generation_time))
+
+        states, obs = robot.simulate(n_steps=steps)
+        print ("\nrunning hmm_inference...")
+        times = test_time_of_execution(robot, states, obs, steps, False)
+        unit_time = np.array(times)/steps
+        print ()
+
+        print ("\nrunning hmm_inference_matrix...")
+        times = test_time_of_execution(robot, states, obs, steps, True)
+        unit_time2 = np.array(times)/steps
+        print("Results:")
+        print (unit_time/unit_time2)
+        maze_ratio = (unit_time/unit_time2)/len(robot.maze.get_free_positions())
+        print (maze_ratio)
+
+        time_ratio_per_num_states.append(maze_ratio)
+    time_ratio_per_num_states = np.array(time_ratio_per_num_states)
+    print ("Ratio between implementations mean: {} std: {}".format(
+        np.mean(time_ratio_per_num_states, axis=0),
+        np.std(time_ratio_per_num_states, axis=0)))
+
+
+
 
 
 def get_hit_rate(states, beliefs):
@@ -363,6 +457,8 @@ if __name__ == '__main__':
         print('======', st, 'STEPS ======')
         evaluate(steps=st)
         print('')
+
+    #compare_hmm_inferences_performance()
 
     #test_matrix_alg_steps()
     #test_pt()
