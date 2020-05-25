@@ -10,6 +10,8 @@ from collections import Counter
 from itertools import product
 
 from utils import weighted_random_choice, normalized
+from probability_vector import ProbabilityVector, ProbabilityMatrix
+
 from hmm import HMM
 import random
 
@@ -322,3 +324,33 @@ class Robot(HMM):
       if not init_state:
          init_state = self.position
       return super().simulate(init_state, n_steps)
+
+   def init_models(self):
+      """Initialize the trasition and emission models"""
+      self.A = self._initialize_transition_model()
+      self.B = self._initialize_emmision_model()
+
+
+   def _initialize_transition_model(self):
+      """Initialize transition model as a matrix of probability distribution"""
+      model = ProbabilityMatrix(states=sorted(self.get_states()), obs=sorted(self.get_states()))
+      for state in self.get_states():
+         for successor, prob in self.get_next_state_distr(state).items():
+            model[state, successor] = prob
+      return model
+
+   def _initialize_emmision_model(self):
+      """Initialize emission model as a matrix of probability distribution"""
+      model = ProbabilityMatrix(states=sorted(self.get_states()), obs=sorted(self.get_observations()))
+      stored_state = self.position
+      for state in self.get_states():
+         self.position = state
+         for obs in self.get_observations():
+            prob = 1
+            for sensor, value in zip(self.sensors, obs):
+               p = sensor.get_value_probabilities()
+               prob *= p[value]
+            model[obs, state] = prob
+      # Restore robot position
+      self.position = stored_state
+      return model
