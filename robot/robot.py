@@ -261,9 +261,11 @@ class Robot(HMM):
         return p
 
     def assign_maze(self, maze):
+        """Assign maze to robot"""
         self.maze = maze
 
     def init_models(self):
+        """Initialize the trasition and emission models"""
         self.A = self._initialize_transition_model()
         self.B = self._initialize_emmision_model()
 
@@ -296,6 +298,7 @@ class Robot(HMM):
         return normalized(p)
 
     def _initialize_transition_model(self):
+        """Initialize transition model as a matrix of probability distribution"""
         model = ProbabilityMatrix(states=sorted(self.get_states()), obs=sorted(self.get_states()))
         for state in self.get_states():
             for successor, prob in self._get_next_state_distr(state).items():
@@ -303,6 +306,7 @@ class Robot(HMM):
         return model
 
     def _initialize_emmision_model(self):
+        """Initialize emission model as a matrix of probability distribution"""
         model = ProbabilityMatrix(states=sorted(self.get_states()), obs=sorted(self.get_observations()))
         stored_state = self.position
         for state in self.get_states():

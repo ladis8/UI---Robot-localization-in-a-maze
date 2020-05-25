@@ -26,7 +26,7 @@ def predict(n_steps, init_B, hmm):
     :param n_steps: number of time-step updates we shall execute
     :param init_B: ProbabilityVector, initial distribution over the states
     :param hmm: contains the transition model hmm.pt(from, to)
-    :return: sequence of belief distributions (list of Counters),
+    :return: sequence of belief distributions (list of ProbabilityVectors),
              for each time slice one belief distribution;
              prior distribution shall not be included
     """
@@ -45,7 +45,7 @@ def update_belief_by_evidence(prev_B, e, hmm):
     :param e: a single evidence/observation used for update
     :param hmm: HMM for which we compute the update
     :param normalize: bool, whether the result shall be normalized
-    :return: Counter, current (updated) belief distribution over states
+    :return: ProbabilityVector, current (updated) belief distribution over states
     """
     return hmm.B[e] * prev_B
 
@@ -57,7 +57,7 @@ def forward1(prev_f, cur_e, hmm, normalize=False):
     :param cur_e: a single current observation
     :param hmm: HMM, contains the transition and emission models
     :param normalize: bool, should we normalize on the fly?
-    :return: Counter, current belief distribution over states
+    :return: ProbabilityVector, current belief distribution over states
     """
     cur_f = update_belief_by_time_step(prev_f, hmm)
     cur_f = update_belief_by_evidence(cur_f, cur_e, hmm)
@@ -69,10 +69,10 @@ def forward1(prev_f, cur_e, hmm, normalize=False):
 def forward(init_f, e_seq, hmm):
     """Compute the filtered belief states given the observation sequence
  
-    :param init_f: Counter, initial belief distribution over the states
+    :param init_f: ProbabilityVector, initial belief distribution over the states
     :param e_seq: sequence of observations
     :param hmm: contains the transition and emission models
-    :return: sequence of Counters, estimates of belief states for all time slices
+    :return: sequence of ProbabilityVectors, estimates of belief states for all time slices
     """
     f = init_f  # Forward message, updated each iteration
     fs = []  # Sequence of forward messages, one for each time slice
@@ -86,7 +86,7 @@ def likelihood(init_f, e_seq, hmm):
     """Compute the likelihood of the model wrt the evidence sequence
  
     In other words, compute the marginal probability of the evidence sequence.
-    :param init_f: Counter, initial belief distribution over states
+    :param init_f: ProbabilityVector, initial belief distribution over states
     :param e_seq: sequence of observations
     :param hmm: contains the transition and emission models
     :return: number, likelihood
@@ -104,7 +104,7 @@ def backward1(next_b, next_e, hmm):
     :param next_b: ProbabilityVector, the backward message from the next time slice
     :param next_e: a single evidence for the next time slice
     :param hmm: HMM, contains the transition and emission models
-    :return: Counter, current backward message
+    :return: ProbabilityVector, current backward message
     """
     return hmm.A.T @ (hmm.B[next_e] * next_b)
 
@@ -115,7 +115,7 @@ def forwardbackward(priors, e_seq, hmm):
     :param priors: ProbabilityVector, initial belief distribution over rge states
     :param e_seq: sequence of observations
     :param hmm: HMM, contians the transition and emission models
-    :return: sequence of Counters, estimates of belief states for all time slices
+    :return: sequence of ProbabilityVectors, estimates of belief states for all time slices
     """
     se = []  # Smoothed belief distributions
     fs = forward(priors, e_seq, hmm)
@@ -134,7 +134,7 @@ def viterbi1(prev_m, cur_e, hmm):
     :param cur_e: current observation used for update
     :param hmm: HMM, contains transition and emission models
     :return: (cur_m, predecessors), i.e.
-             Counter, an updated max message, and
+             ProbabiltyVector, an updated max message, and
              dict with the best predecessor of each state
     """
     predecessors = (hmm.A * prev_m).argmax_row.to_dict()        #argmax of rows a = (hmm.A * prev_m)
@@ -148,11 +148,11 @@ def viterbi1_log(prev_m, cur_e, hmm):
     """Perform a single update of the max message for Viterbi algorithm
        using log probabilities
  
-    :param prev_m: Counter, max message from the previous time slice
+    :param prev_m: ProbabilityVector, max message from the previous time slice
     :param cur_e: current observation used for update
     :param hmm: HMM, contains transition and emission models
     :return: (cur_m, predecessors), i.e.
-             Counter, an updated max message, and
+              ProbabilityVector, an updated max message, and
              dict with the best predecessor of each state
     """
     predecessors = (hmm.A.log + prev_m).argmax_row.to_dict()        #argmax of rows a = (hmm.A * prev_m)
@@ -163,7 +163,7 @@ def viterbi1_log(prev_m, cur_e, hmm):
 def viterbi_normal(prior, e_seq, hmm):
     """Find the most likely sequence of states using Viterbi algorithm
  
-    :param prior: Counter, prior belief distribution
+    :param prior: Probabilty Vector, prior belief distribution
     :param e_seq: sequence of observations
     :param hmm: HMM, contains the transition and emission models
     :return: (sequence of states, sequence of max messages)
@@ -190,7 +190,7 @@ def viterbi_log(prior, e_seq, hmm):
     """Find the most likely sequence of states using Viterbi algorithm
        using log probabilities
  
-       :param prior: Counter, prior belief distribution
+       :param prior: ProbabilityVector, prior belief distribution
        :param e_seq: sequence of observations
        :param hmm: HMM, contains the transition and emission models
        :return: (sequence of states, sequence of max messages)

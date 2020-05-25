@@ -4,25 +4,28 @@ Example scripts for Robot in a maze HMM
 BE3M33UI - Artificial Intelligence course, FEE CTU in Prague
 """
 
-# from hmm_inference import *
 import os
 import numpy as np
 import random as rnd
 import time
 import importlib
 
-
-USE_MATRIX = False
+# TOGGLE between hmm_interface_matrix and normal hmm_interface
+USE_MATRIX = True
 if USE_MATRIX:
     from hmm_inference_matrix import *
 else:
     from hmm_inference import *
 
-ROBOT_MODEL = 'FWD-LR' # {'FWD-LR', 'NESW'}
+
+# TOGGLE between FWD-LR robot and NESW robot
+ROBOT_MODEL = 'NESW' # {'FWD-LR', 'NESW'}
 if ROBOT_MODEL == 'NESW':
     from robot import *
-else:
+elif ROBOT_MODEL == 'FWD-LR':
     from robot_1_model import *
+else:
+    print("Not supported!")
 
 from utils import normalized, init_belief, get_key_value_tuples
 import probability_vector as pv
@@ -31,12 +34,6 @@ import numpy as np
 import random as rnd
 
 
-direction_probabilities = {
-    NORTH: 0.25,
-    EAST: 0.25,
-    SOUTH: 0.25,
-    WEST: 0.25
-}
 
 ALL_MAZES = [
     'mazes/rect_3x2_empty.map',
@@ -50,12 +47,10 @@ ALL_MAZES = [
 
 ]
 
-#TODO: move more functions to tools
 
 def init_maze(maze_name='mazes_custom/rect_13x14_symmetric_sparse.map'):
     """Create and initialize robot instance for subsequent test"""
     m = Maze(maze_name)
-    #    robot = Robot(ALL_DIRS, direction_probabilities)
     robot = Robot()
     robot.assign_maze(m)
     robot.position = (1, 1) if ROBOT_MODEL == 'NESW' else (1, 1, 0)
@@ -79,7 +74,6 @@ def print_robot(robot):
 def test_pt():
     """Try to compute transition probabilities for certain position"""
     robot = init_maze()
-    robot.position = (2, 10)
     print('Robot at', robot.position)
     for pos in robot.maze.get_free_positions():
         p = robot.pt(robot.position, pos)
@@ -90,7 +84,6 @@ def test_pt():
 def test_pe():
     """Try to compute the observation probabilities for certain position"""
     robot = init_maze()
-    robot.position = (1, 5)
     print('Robot at', robot.position)
     for obs in robot.get_observations():
         p = robot.pe(robot.position, obs)
@@ -132,7 +125,7 @@ def test_smoothing():
     """Try to run smoothing for robot domain"""
     robot = init_maze()
     if USE_MATRIX: robot.init_models()
-    states, obs = robot.simulate(init_state=(1, 10), n_steps=10)
+    states, obs = robot.simulate(n_steps=10)
     print('Running smoothing...')
 
     initial_belief = init_belief(robot.get_states(), USE_MATRIX)
@@ -151,7 +144,7 @@ def test_viterbi():
     """Try to run Viterbi alg. for robot domain"""
     robot = init_maze()
     if USE_MATRIX: robot.init_models()
-    states, obs = robot.simulate(init_state=(3, 3), n_steps=10)
+    states, obs = robot.simulate(n_steps=10)
 
     print('Running Viterbi...')
     initial_belief = init_belief(robot.get_states(), USE_MATRIX)
@@ -164,7 +157,7 @@ def test_viterbi_log():
     """Try to run log-based Viterbi alg. for robot domain"""
     robot = init_maze()
     if USE_MATRIX: robot.init_models()
-    states, obs = robot.simulate(init_state=(1, 1), n_steps=10)
+    states, obs = robot.simulate(n_steps=10)
 
     print('Running log-based Viterbi...')
     initial_belief = init_belief(robot.get_states(), USE_MATRIX)
@@ -177,29 +170,30 @@ def test_viterbi_log():
 
 
 def test_matrix_alg_steps():
-    def test_steps_normal(robot, obs, obs2, initial_belief):
-        from hmm_inference import forward1, backward1, viterbi1, viterbi1_log
+    """Basic test to compare results of naive hmm_inference and hmm_inference_matrix for all algorithm updates"""
 
-        v1 = forward1(initial_belief, obs, robot)
-        v2 = forward1(v1, obs2, robot)
-        back_v = backward1(v2, obs2, robot)
-        viterbi_v_log = viterbi1_log(initial_belief, obs, robot)[0]
-        viterbi_v = viterbi1(initial_belief, obs, robot)[0]
+    def test_steps_normal(robot, obs, obs2, initial_belief):
+        globals()["hmm_inference"] = importlib.import_module("hmm_inference")
+
+        v1 = hmm_inference.forward1(initial_belief, obs, robot)
+        v2 = hmm_inference.forward1(v1, obs2, robot)
+        back_v = hmm_inference.backward1(v2, obs2, robot)
+        viterbi_v_log = hmm_inference.viterbi1_log(initial_belief, obs, robot)[0]
+        viterbi_v = hmm_inference.viterbi1(initial_belief, obs, robot)[0]
         return [v1, v2, back_v, viterbi_v, viterbi_v_log]
 
     def test_steps_matrix(robot, obs, obs2, initial_belief):
-        from hmm_inference_matrix import forward1, backward1, viterbi1, viterbi1_log
+        globals()["hmm_inference"] = importlib.import_module("hmm_inference")
         initial_belief = pv.ProbabilityVector.initialize_from_dict(initial_belief)
 
-        v1_m = forward1(initial_belief, obs, robot)
-        v2_m = forward1(v1_m, obs2, robot)
-        back_v_m = backward1(v2_m, obs2, robot)
-        viterbi_v_m_log = viterbi1_log(initial_belief, obs, robot)[0]
-        viterbi_v_m = viterbi1(initial_belief, obs, robot)[0]
+        v1_m = hmm_inference.forward1(initial_belief, obs, robot)
+        v2_m = hmm_inference.forward1(v1_m, obs2, robot)
+        back_v_m = hmm_inference.backward1(v2_m, obs2, robot)
+        viterbi_v_m_log = hmm_inference.viterbi1_log(initial_belief, obs, robot)[0]
+        viterbi_v_m = hmm_inference.viterbi1(initial_belief, obs, robot)[0]
         return [v1_m, v2_m, back_v_m, viterbi_v_m, viterbi_v_m_log]
 
     robot = init_maze()
-    robot.position = (1, 5)
     robot.init_models()
 
     obs = ('f', 'n', 'f', 'n')
@@ -216,7 +210,9 @@ def test_matrix_alg_steps():
         print()
 
 
+
 def compare_hmm_inferences_performance():
+    """Test to compare performace of naive hmm_inference and hmm_inference_matrix by measuring time of execution"""
 
     def test_time_of_execution(robot, states, obs, n_states, use_matrix):
         globals()["hmm_inference"] = importlib.import_module("hmm_inference_matrix" if use_matrix else "hmm_inference")
@@ -323,6 +319,7 @@ def get_euclidean_dist(states, beliefs):
 
 
 def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None, VERBOSE=2):
+    """Test to evaluate the localization performance in one maze"""
 
     hit_rate_filter, manhattan_dist_filter, euclidean_dist_filter = [], [], []
     hit_rate_smooth, manhattan_dist_smooth, euclidean_dist_smooth = [], [], []
@@ -432,6 +429,7 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
         file_obj.write(str(hit_rate_viterbi) + '\t' + str(manhattan_dist_viterbi) + '\t' + str(euclidean_dist_viterbi) + '\n')
 
 def evaluate(steps=10):
+    """Test to evaluate performance of localization in all mazes and output results to file"""
     path = 'mazes/'
     mazes = os.listdir(path)
     file = open("outfile.txt", "a+")
@@ -452,19 +450,18 @@ if __name__ == '__main__':
     rnd.seed(314)
     print('Uncomment some of the tests in the main section')
 
-    steps_list = [10, 20, 50, 100, 300]
-    for st in steps_list:
-        print('======', st, 'STEPS ======')
-        evaluate(steps=st)
-        print('')
+    # steps_list = [10, 20, 50, 100, 300]
+    # for st in steps_list:
+    #     print('======', st, 'STEPS ======')
+    #     evaluate(steps=st)
+    #     print('')
 
-    #compare_hmm_inferences_performance()
-
-    #test_matrix_alg_steps()
+    test_matrix_alg_steps()
     #test_pt()
     #test_pe()
     #test_simulate()
-    # test_filtering()
-    # test_smoothing()
-    # test_viterbi()
-    # test_viterbi_log()
+    #test_filtering()
+    #test_smoothing()
+    #test_viterbi()
+    #test_viterbi_log()
+    #compare_hmm_inferences_performance()

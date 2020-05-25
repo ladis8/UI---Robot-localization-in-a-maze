@@ -5,6 +5,7 @@ import pandas as pd
 
 
 class ProbabilityVector:
+    """Representation of probability distribution - wrapper of numpy array"""
     def __init__(self, states, values, sort=False):
         assert (len(states) == len(values))
         if sort:
@@ -15,12 +16,14 @@ class ProbabilityVector:
 
     @classmethod
     def initialize_from_dict(cls, vector_dict):
+        """For the compatibility between Counter - Probability Vector"""
         states = sorted(vector_dict.keys())
         values = np.array(list(map(lambda state: vector_dict[state], vector_dict.keys())))
         return cls(states, values, sort=False)
 
     @classmethod
     def rand_initialize(cls, states):
+        """Random initialization"""
         rand = np.random.rand(len(states))
         factor = 1/sum(rand)
         rand *= factor
@@ -28,13 +31,19 @@ class ProbabilityVector:
 
     @classmethod
     def uniform_initialize(cls, states):
+        """Uniform initialization"""
         values = np.ones(len(states)) * 1/len(states)
         return cls(sorted(states), values, sort=False)
 
     def normalize(self):
+        """Normalization of probability distribution"""
         factor = 1 / sum(self.values)
         self.values *= factor
         return self
+
+    def argmax(self):
+        index = self.values.argmax()
+        return self.states[index]
 
     @property
     def log(self):
@@ -54,11 +63,12 @@ class ProbabilityVector:
         return "Probability Vector states: {} -> values {}.".format(self.states, self.values)
 
     def __eq__(self, other):
+        # for comparing with other Probability vector
         if isinstance(other, ProbabilityVector):
             if (self.states == other.states) and (self.values == other.values).all():
                 return True
+        # for comparing with Counter
         elif isinstance(other, Counter):
-            # print([(np.isinf(self.values[i, 0]) and np.isinf(other[state])) or abs(self.values[i, 0] - other[state]) < 1e-12 for i, state in enumerate(self.states)])
             if (self.states == sorted(other.keys()) and \
                     all([(np.isinf(self.values[i, 0]) and np.isinf(other[state]))
                          or abs(self.values[i, 0] - other[state]) < 1e-12 for i, state in enumerate(self.states)])):
@@ -68,12 +78,14 @@ class ProbabilityVector:
         return False
 
     def __getitem__(self, state):
+        # indexing in vector
         if state not in self.states:
             raise ValueError("Unknown state")
         index = self.states.index(state)
         return self.values[index,0]
 
     def __add__(self, other):
+        # addition to other Probability vector
         if isinstance(other, ProbabilityVector):
             values = self.values + other.values
             return ProbabilityVector(self.states, values)
@@ -86,6 +98,7 @@ class ProbabilityVector:
         if isinstance(other, ProbabilityVector):
             vals = self.values * other.values
             return ProbabilityVector(self.states, vals)
+        # deprecated
         # multiplication with Dataframe column
         # elif isinstance(other, pd.Series):
         #     vals = self.values * other.values.reshape(-1, 1)
@@ -93,26 +106,15 @@ class ProbabilityVector:
         # elif isinstance(other, np.ndarray):
         #     vals = self.values * other.reshape(-1, 1)
         # # element-wise matrix multiplication with Pandas matrix
-        elif isinstance(other, pd.DataFrame):
-            return self.df * other
+        # elif isinstance(other, pd.DataFrame):
+        #     return self.df * other
         else:
             raise NotImplementedError
 
 
-    # def __rmatmul__(self, other):
-    #     # matrix multiplication with numpy ndarray matrix
-    #     if isinstance(other, np.ndarray):
-    #         return ProbabilityVector(dict(zip(self.states, other @ self.values)))
-    #     # matrix multiplication with DataFrame matrix
-    #     elif isinstance(other, pd.DataFrame):
-    #         return ProbabilityVector(dict(zip(self.states, other.values @ self.values)))
-
-    def argmax(self):
-        index = self.values.argmax()
-        return self.states[index]
-
 
 class ProbabilityMatrix:
+    """Representation of probability models (matrix) - wrapper of pandas dataframe"""
     def __init__(self, states, obs, prob_vectors=None, sort=False):
         self.states = states
         self.obs = obs
@@ -125,16 +127,6 @@ class ProbabilityMatrix:
             values = np.zeros(shape=(self.m, self.n))
 
         self.df = pd.DataFrame(values, index=self.states, columns=self.obs)
-
-    # @classmethod
-    # def initialize(cls, states: list, observables: list):
-    #     size = len(states)
-    #     rand = np.random.rand(size, len(observables)) \
-    #            / (size ** 2) + 1 / size
-    #     rand /= rand.sum(axis=1).reshape(-1, 1)
-    #     aggr = [dict(zip(observables, rand[i, :])) for i in range(len(states))]
-    #     pvec = [ProbabilityVector(x) for x in aggr]
-    #     return cls(dict(zip(states, pvec)))
 
     @classmethod
     def from_numpy(cls, states, obs, values):
@@ -160,10 +152,12 @@ class ProbabilityMatrix:
 
     @property
     def argmax_row(self):
+        """Getting states with maximum values in matrix rows"""
         return self.df.idxmax(axis=1)
 
     @property
     def max_row(self):
+        """Getting maximum values in matrix rows"""
         return ProbabilityVector(self.states, self.df.values.max(axis=1))
 
     def assign_dateframe(self, df):
@@ -173,8 +167,8 @@ class ProbabilityMatrix:
         return "Probability matrix states: {} -> values: {}.".format(
             self.states, self.df.values.shape)
 
-    # row-wise product with Probability Vector
     def __mul__(self, other):
+        # row-wise product with Probability Vector
         if isinstance(other, ProbabilityVector):
             new_df = self.df * other.values.squeeze() #row-wise
             new = ProbabilityMatrix(self.states, self.obs)
@@ -183,8 +177,8 @@ class ProbabilityMatrix:
         else:
             raise NotImplementedError
 
-    # row-wise sum with Probability Vector
     def __add__(self, other):
+        # row-wise sum with Probability Vector
         if isinstance(other, ProbabilityVector):
             new_df = self.df + other.values.squeeze() #row-wise
             new = ProbabilityMatrix(self.states, self.obs)
@@ -194,25 +188,26 @@ class ProbabilityMatrix:
             raise NotImplementedError
 
 
-    # matrix multiplication with Probability Vector or Probability matrix
     def __matmul__(self, other):
+        # matrix multiplication with Probability Vector
         if isinstance(other, ProbabilityVector):
             values = self.df.values @ other.values
             return ProbabilityVector(self.states, values)
         # matrix multiplication with Probability matrix
-        # elif isinstance(other, ProbabilityMatrix):
-        #     assert (self.df.shape[1] == other.df.shape[0], "Matrix multiplication isn't supported")
-        #     values = self.df.values @ other.df.values
-        #     return ProbabilityMatrix.from_numpy(self.states, self.obs, values)
+        elif isinstance(other, ProbabilityMatrix):
+            assert (self.df.shape[1] == other.df.shape[0], "Matrix multiplication isn't supported")
+            values = self.df.values @ other.df.values
+            return ProbabilityMatrix.from_numpy(self.states, self.obs, values)
         else:
             raise NotImplementedError
 
     def __getitem__(self, pos):
-        # requesting number
+        # indexing
+        # requesting by row/column state ---> number
         if len(pos) == 2 and pos[0] in self.obs:
             column, row = pos
             return self.df[column][row]
-        # requesting column
+        # requesting by column state --> column
         elif pos in self.obs:
             column = pos
             return ProbabilityVector(self.states, self.df[column].values, sort=False)
@@ -220,11 +215,11 @@ class ProbabilityMatrix:
             raise NotImplementedError
 
     def __setitem__(self, pos, value):
-        # setting number
+        # setting by row/column state --> number
         if len(pos) == 2 and pos[0] in self.obs:
             column, row = pos
             self.df[column][row] = value
-        # setting column
+        # setting by column state --> column
         elif pos in self.obs:
             column = pos
             self.df[column] = value.df

@@ -44,6 +44,7 @@ def normalized(P, factor=None, return_normalization_factor=False):
         return norm
 
 def init_belief(states, use_probability_vector=False):
+    """Initialize the uniform distribution either as Counter or Probability Vector"""
 
     if use_probability_vector:
         initial_belief = pv.ProbabilityVector.uniform_initialize(states)
@@ -54,6 +55,7 @@ def init_belief(states, use_probability_vector=False):
 
 
 def get_key_value_tuples(data, use_probability_vector=False):
+    """Iterates over pairs (state, probability)"""
     if use_probability_vector:
         key_value_tuples = zip(data.states, data.values)
     else:
