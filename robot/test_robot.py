@@ -456,7 +456,7 @@ if __name__ == '__main__':
     #     evaluate(steps=st)
     #     print('')
 
-    test_matrix_alg_steps()
+    #test_matrix_alg_steps()
     #test_pt()
     #test_pe()
     #test_simulate()
