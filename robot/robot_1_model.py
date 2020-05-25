@@ -21,13 +21,6 @@ SOUTH = (1, 0)
 WEST = (0, -1)
 ALL_DIRS = (NORTH, EAST, SOUTH, WEST)
 
-# DEFAULT_MOVE_PROBS = {
-#    NORTH: 0.25,
-#    EAST: 0.25,
-#    SOUTH: 0.25,
-#    WEST: 0.25
-# }
-
 FWD, TURN_RIGHT, TURN_LEFT = 0, 1, 2
 
 FWD_MOVE_PROBS = {
@@ -35,12 +28,6 @@ FWD_MOVE_PROBS = {
    TURN_RIGHT: 1 / 6,
    TURN_LEFT: 1 / 6
 }
-
-# FWD_MOVE_PROBS = {
-#    FWD: 1/3,
-#    TURN_RIGHT: 1/3,
-#    TURN_LEFT: 1/3
-# }
 
 N, E, S, W = 0, 1, 2, 3
 ALL_ORIS = (N, E, S, W)
@@ -56,15 +43,6 @@ SENSORS_SWITCH = {
 def add(s, dir):
    """Add direction to a state"""
    return tuple(a + b for a, b in zip(s, dir))
-
-
-# def direction(s1, s2):
-#    """Return a direction vector from s1 to s2"""
-#    return tuple(b - a for a, b in zip(s1, s2))
-
-
-# def manhattan(s1, s2):
-#    return sum(abs(a) for a in direction(s1, s2))
 
 
 class Maze:

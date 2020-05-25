@@ -208,8 +208,7 @@ def test_matrix_alg_steps():
         # for state in v_matrix.states:
         #     print(state, ": "," ", v_matrix[state], "/", v_normal[state])
         print()
-
-
+        
 
 def compare_hmm_inferences_performance():
     """Test to compare performace of naive hmm_inference and hmm_inference_matrix by measuring time of execution"""
@@ -293,9 +292,6 @@ def compare_hmm_inferences_performance():
         np.std(time_ratio_per_num_states, axis=0)))
 
 
-
-
-
 def get_hit_rate(states, beliefs):
     hits = 0
     for s, b in zip(states, beliefs):
@@ -328,7 +324,6 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
     robot = init_maze(maze_name)
 
     fp0 = robot.maze.get_free_positions()
-    fp = rnd.sample(fp0, 10) if len(fp0) > 10 else fp0
     for ipos in fp:
         if VERBOSE >= 1: print('------------------------------------')
         if VERBOSE >= 1: print(np.round(100*(fp.index(ipos)+1)/len(fp), 0), '%\tof inital positions')
@@ -345,11 +340,6 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
             most_belief_state = sorted(belief.items(), key=lambda x: x[1], reverse=True)[0][0]
             most_beliefs.append(most_belief_state)
             if VERBOSE >= 4: print('Real state:', state, '| Best belief:', most_belief_state)
-        # cumsum
-        # hit_rate_filter += get_hit_rate(states, most_beliefs)
-        # manhattan_dist_filter += get_manhattan_dist(states, most_beliefs)
-        # euclidean_dist_filter += get_euclidean_dist(states, most_beliefs)
-        # append
         hit_rate_filter.append(get_hit_rate(states, most_beliefs))
         manhattan_dist_filter.append(get_manhattan_dist(states, most_beliefs))
         euclidean_dist_filter.append(get_euclidean_dist(states, most_beliefs))
@@ -363,11 +353,6 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
             most_belief_state = sorted(belief.items(), key=lambda x: x[1], reverse=True)[0][0]
             most_beliefs.append(most_belief_state)
             if VERBOSE >= 4: print('Real state:', state, '| Best belief:', most_belief_state)
-        # cumsum
-        # hit_rate_smooth += get_hit_rate(states, most_beliefs)
-        # manhattan_dist_smooth += get_manhattan_dist(states, most_beliefs)
-        # euclidean_dist_smooth += get_euclidean_dist(states, most_beliefs)
-        # append
         hit_rate_smooth.append(get_hit_rate(states, most_beliefs))
         manhattan_dist_smooth.append(get_manhattan_dist(states, most_beliefs))
         euclidean_dist_smooth.append(get_euclidean_dist(states, most_beliefs))
@@ -379,11 +364,6 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
         if VERBOSE >= 4:
             for real, est in zip(states, ml_states):
                 print('Real pos:', real, '| ML Estimate:', est)
-        # cumsum
-        # hit_rate_viterbi += get_hit_rate(states, ml_states)
-        # manhattan_dist_viterbi += get_manhattan_dist(states, ml_states)
-        # euclidean_dist_viterbi += get_euclidean_dist(states, ml_states)
-        # append
         hit_rate_viterbi.append(get_hit_rate(states, ml_states))
         manhattan_dist_viterbi.append(get_manhattan_dist(states, ml_states))
         euclidean_dist_viterbi.append(get_euclidean_dist(states, ml_states))
@@ -392,20 +372,6 @@ def evaluate1(steps=10, maze_name='mazes/rect_6x10_obstacles.map', file_obj=None
     if VERBOSE >= 2: print('------------------------------------')
     if VERBOSE >= 2: print('------------------------------------')
 
-    # cumsum
-    # hit_rate_filter /= len(fp)
-    # manhattan_dist_filter /= len(fp)
-    # euclidean_dist_filter /= len(fp)
-    #
-    # hit_rate_smooth /= len(fp)
-    # manhattan_dist_smooth /= len(fp)
-    # euclidean_dist_smooth /= len(fp)
-    #
-    # hit_rate_viterbi /= len(fp)
-    # manhattan_dist_viterbi /= len(fp)
-    # euclidean_dist_viterbi /= len(fp)
-
-    # append
     hit_rate_filter = np.median(sorted(hit_rate_filter))
     manhattan_dist_filter = np.median(sorted(manhattan_dist_filter))
     euclidean_dist_filter = np.median(sorted(euclidean_dist_filter))
@@ -432,18 +398,18 @@ def evaluate(steps=10):
     """Test to evaluate performance of localization in all mazes and output results to file"""
     path = 'mazes/'
     mazes = os.listdir(path)
-    file = open("outfile.txt", "a+")
+    # file = open("outfile.txt", "a+")
 
-    file.write('\n\n------------------------' + str(steps) + '\n')
+    # file.write('\n\n------------------------' + str(steps) + '\n')
 
     for maze in mazes:
         print('---', maze, '---')
         file.write(maze + '\n')
 
-        evaluate1(steps=steps, maze_name=path+maze, file_obj=file, VERBOSE=2)
-        # evaluate1(steps=steps, maze_name=path+maze)
+        # evaluate1(steps=steps, maze_name=path+maze, file_obj=file, VERBOSE=2)
+        evaluate1(steps=steps, maze_name=path+maze)
 
-    file.close()
+    # file.close()
 
 
 if __name__ == '__main__':
@@ -456,12 +422,12 @@ if __name__ == '__main__':
     #     evaluate(steps=st)
     #     print('')
 
-    #test_matrix_alg_steps()
-    #test_pt()
-    #test_pe()
-    #test_simulate()
-    #test_filtering()
-    #test_smoothing()
-    #test_viterbi()
-    #test_viterbi_log()
-    #compare_hmm_inferences_performance()
+    # test_matrix_alg_steps()
+    # test_pt()
+    # test_pe()
+    # test_simulate()
+    # test_filtering()
+    # test_smoothing()
+    # test_viterbi()
+    # test_viterbi_log()
+    # compare_hmm_inferences_performance()
